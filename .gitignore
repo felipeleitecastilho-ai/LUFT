@@ -1,0 +1,34 @@
+# Chaves e credenciais
+*.p8
+*.pem
+*.key
+*.env
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Dados e backups grandes
+*.csv
+*.xlsx
+*.sql
+*.txt
+*.docx
+*.pdf
+
+# Pastas de dados/backups do projeto
+DRE/
+DRE_PROCESSADO/
+RAZAO/
+CONTRATOS/
+Arquivos Landing/
+NOVAS INGESTOES/
+
+# Outros
+painel_etl_prototipo.html
