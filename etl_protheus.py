@@ -21,7 +21,6 @@ SF_SCHEMA = 'BRONZE'
 # === CONFIGURACOES GERAIS ===
 BASE_DIR = r'C:\Users\keyrus\etl_luft'
 CSV_DIR = os.path.join(BASE_DIR, 'temp')
-LAST_RUN_FILE = os.path.join(BASE_DIR, 'last_run.txt')
 BATCH_SIZE = 50000
 MARGEM_DIAS = 2
 
@@ -65,15 +64,21 @@ TABELAS = [
 def log(msg):
     print(f'[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {msg}')
 
-def get_last_run():
-    if os.path.exists(LAST_RUN_FILE):
-        with open(LAST_RUN_FILE, 'r') as f:
-            return f.read().strip()
+def get_last_run(sf_conn):
+    cur = sf_conn.cursor()
+    cur.execute("SELECT TO_CHAR(ULTIMA_DATA_CARGA, 'YYYYMMDD') FROM DRE_AGENTE_ALL.BRONZE.ETL_CONTROL WHERE API_NAME = 'COMPRAS_PROTHEUS'")
+    row = cur.fetchone()
+    if row and row[0]:
+        return row[0]
     return None
 
-def set_last_run(data):
-    with open(LAST_RUN_FILE, 'w') as f:
-        f.write(data)
+def set_last_run(sf_conn, data):
+    cur = sf_conn.cursor()
+    cur.execute(f"""
+        UPDATE DRE_AGENTE_ALL.BRONZE.ETL_CONTROL 
+        SET ULTIMA_DATA_CARGA = '{data}', UPDATED_AT = CURRENT_TIMESTAMP()
+        WHERE API_NAME = 'COMPRAS_PROTHEUS'
+    """)
 
 def conectar_snowflake():
     with open(SF_KEY_PATH, 'rb') as key_file:
@@ -118,7 +123,7 @@ def processar_tabela(tab, sf_conn):
 
         # Montar query
         if modo == 'incremental':
-            last_run = get_last_run()
+            last_run = get_last_run(sf_conn)
             if last_run:
                 dt_last = datetime.datetime.strptime(last_run, '%Y%m%d')
                 dt_filtro = (dt_last - datetime.timedelta(days=MARGEM_DIAS)).strftime('%Y%m%d')
@@ -171,8 +176,8 @@ def processar_tabela(tab, sf_conn):
         sf_cur = sf_conn.cursor()
 
         # DELETE ou TRUNCATE conforme modo
-        if modo == 'incremental' and get_last_run():
-            dt_last = datetime.datetime.strptime(get_last_run(), '%Y%m%d')
+        if modo == 'incremental' and get_last_run(sf_conn):
+            dt_last = datetime.datetime.strptime(get_last_run(sf_conn), '%Y%m%d')
             dt_filtro = (dt_last - datetime.timedelta(days=MARGEM_DIAS)).strftime('%Y%m%d')
             sf_cur.execute(f"DELETE FROM {tab['tabela_sf']} WHERE {tab['coluna_data']} >= '{dt_filtro}'")
             qt_deletados = sf_cur.fetchone()[0]
@@ -229,8 +234,8 @@ if __name__ == '__main__':
 
         # Atualiza last_run (usado pelo incremental de COMPRAS)
         hoje = datetime.datetime.now().strftime('%Y%m%d')
-        set_last_run(hoje)
-        log(f'last_run.txt atualizado: {hoje}')
+        set_last_run(sf_conn, hoje)
+        log(f'ETL_CONTROL atualizado: {hoje}')
         log(f'=== ETL CONCLUIDO: {total_geral} registros totais ===')
     except Exception as e:
         log(f'ERRO GERAL: {e}')

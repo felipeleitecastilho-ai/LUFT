@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="snowflake-source" content="cortex-agent-authored" />
+  <title>ETL LUFT - Painel de Monitoramento</title>
+  <script type="application/json" id="snowflake-report-metadata">
+  {
+    "generated": "2026-08-21",
+    "intent": "Painel de monitoramento ETL LUFT (Protheus + SILT) com identidade visual Luft",
+    "sections": [
+      { "id": "status-cards", "title": "Cards de Status", "dataSources": [{"type": "query", "sql": "SELECT * FROM DRE_AGENTE_ALL.BRONZE.ETL_LOG WHERE DT_INICIO >= DATEADD('hour', -25, CURRENT_TIMESTAMP())"}] },
+      { "id": "detalhamento", "title": "Detalhamento por Tabela", "dataSources": [{"type": "query", "sql": "SELECT * FROM DRE_AGENTE_ALL.BRONZE.ETL_LOG WHERE DT_INICIO >= DATEADD('hour', -25, CURRENT_TIMESTAMP()) ORDER BY DT_INICIO"}] },
+      { "id": "volume-diario", "title": "Volume Diario", "dataSources": [{"type": "query", "sql": "SELECT DATE_TRUNC('day', DT_INICIO) AS DATA, SUM(QT_CARREGADOS) FROM DRE_AGENTE_ALL.BRONZE.ETL_LOG GROUP BY 1 ORDER BY 1"}] }
+    ]
+  }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Sans+Pro:wght@300;400;600&display=swap');
+    :root {
+      color-scheme: light dark;
+      --luft-red: #ec2849;
+      --luft-dark: #3C3950;
+      --luft-gray: #99A9B5;
+      --luft-bg: light-dark(#f8f9fb, #1a1a2e);
+      --luft-card: light-dark(#ffffff, #232340);
+      --luft-border: light-dark(#e8eaed, #2e2e4a);
+      --luft-text: light-dark(#3C3950, #e5e7eb);
+      --luft-subtext: light-dark(#99A9B5, #8892a4);
+    }
+    body {
+      font-family: 'Source Sans Pro', -apple-system, sans-serif;
+      max-width: 1100px; width: 100%; box-sizing: border-box;
+      margin: 0 auto; padding: clamp(16px, 4vw, 24px);
+      color: var(--luft-text);
+      background: var(--luft-bg);
+    }
+    h1, h2, h3 { font-family: 'Montserrat', sans-serif; }
+    h1 { color: var(--luft-dark); color: light-dark(#3C3950, #f1f5f9); margin-bottom: 4px; font-weight: 800; font-size: 28px; }
+    h2 { color: var(--luft-red); margin-top: 32px; font-weight: 700; font-size: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .subtitle { color: var(--luft-subtext); margin-bottom: 24px; font-size: 14px; }
+    .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 12px; }
+    .logo-area { display: flex; align-items: center; gap: 12px; }
+    .logo-text { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 32px; color: var(--luft-red); letter-spacing: -1px; }
+    .logo-sub { font-family: 'Montserrat', sans-serif; font-weight: 500; font-size: 11px; color: var(--luft-subtext); text-transform: uppercase; letter-spacing: 2px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 24px 0; }
+    .card { background: var(--luft-card); border: 1px solid var(--luft-border); border-radius: 10px; padding: 20px; border-left: 4px solid var(--luft-red); }
+    .card-label { font-family: 'Montserrat', sans-serif; font-size: 11px; color: var(--luft-subtext); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+    .card-value { font-family: 'Montserrat', sans-serif; font-size: 28px; font-weight: 800; margin-top: 6px; color: light-dark(#3C3950, #f1f5f9); }
+    .card-sub { font-size: 12px; color: var(--luft-subtext); margin-top: 6px; }
+    .status-ok { color: #10b981; }
+    .status-erro { color: var(--luft-red); }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: 'Montserrat', sans-serif; }
+    .badge-protheus { background: light-dark(#3C3950, #2e2e4a); color: light-dark(#ffffff, #c4c9d4); }
+    .badge-silt { background: light-dark(#ec2849, #7a1528); color: #ffffff; }
+    .badge-sucesso { background: light-dark(#d1fae5, #064e3b); color: light-dark(#065f46, #6ee7b7); }
+    .badge-erro { background: light-dark(#fee2e2, #7f1d1d); color: light-dark(#991b1b, #fca5a5); }
+    .badge-full { background: light-dark(#e8eaed, #3a3a5c); color: light-dark(#3C3950, #c4c9d4); }
+    .badge-incremental { background: light-dark(#fef3c7, #78350f); color: light-dark(#92400e, #fcd34d); }
+    .table-wrap { overflow-x: auto; margin: 16px 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border: 1px solid var(--luft-border); padding: 10px 12px; text-align: left; }
+    th { background: light-dark(#3C3950, #2e2e4a); color: #ffffff; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    tr:nth-child(even) { background: light-dark(#f8f9fb, #1e1e36); }
+    tr:hover { background: light-dark(#f0f1f4, #28284a); }
+    .chart-box { position: relative; width: 100%; height: 280px; margin: 16px 0; }
+    .chart-box > canvas { width: 100% !important; height: 100% !important; }
+    .divider { border: none; border-top: 2px solid var(--luft-border); margin: 32px 0; }
+    .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+    .filter-btn { padding: 6px 14px; border: 1px solid var(--luft-border); border-radius: 4px; background: var(--luft-card); color: var(--luft-text); font-size: 12px; font-family: 'Montserrat', sans-serif; font-weight: 500; cursor: pointer; }
+    .filter-btn.active { background: var(--luft-red); color: #fff; border-color: var(--luft-red); }
+    .alert-box { background: light-dark(#fef2f2, #2a0a0a); border-left: 4px solid var(--luft-red); border-radius: 4px; padding: 12px 16px; margin: 8px 0; }
+    .alert-box strong { color: var(--luft-red); }
+    img, svg { max-width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header-bar">
+    <div class="logo-area">
+      <div>
+        <div class="logo-text">LUFT</div>
+        <div class="logo-sub">Logistics</div>
+      </div>
+    </div>
+    <div style="font-family: Montserrat, sans-serif; font-size: 12px; color: var(--luft-subtext);">Atualizado: 21/08/2026 06:02</div>
+  </div>
+  <h1>ETL - Painel de Monitoramento</h1>
+  <p class="subtitle">Protheus + SILT &rarr; Snowflake | Camada Bronze</p>
+
+  <!-- CARDS -->
+  <div class="cards" id="status-cards">
+    <div class="card">
+      <div class="card-label">Status Geral</div>
+      <div class="card-value status-ok">OK</div>
+      <div class="card-sub">6 tabelas processadas</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Registros Hoje</div>
+      <div class="card-value">322.143</div>
+      <div class="card-sub">Protheus: 321.103 | SILT: 1.040</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Duracao Total</div>
+      <div class="card-value">96s</div>
+      <div class="card-sub">Protheus: 72s | SILT: 24s</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Proxima Execucao</div>
+      <div class="card-value">06:00</div>
+      <div class="card-sub">Diario (automatico)</div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- DETALHAMENTO -->
+  <h2 id="detalhamento">Detalhamento por Tabela</h2>
+
+  <div class="filter-bar">
+    <button class="filter-btn active">Todos</button>
+    <button class="filter-btn">Protheus</button>
+    <button class="filter-btn">SILT</button>
+    <button class="filter-btn">Erros</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Tabela</th>
+          <th>Fonte</th>
+          <th>Modo</th>
+          <th>Extraidos</th>
+          <th>Carregados</th>
+          <th>Total Base</th>
+          <th>Duracao</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>COMPRAS_PROTHEUS_RAW</td>
+          <td><span class="badge badge-protheus">PROTHEUS</span></td>
+          <td><span class="badge badge-incremental">Incremental</span></td>
+          <td>1.132</td>
+          <td>1.132</td>
+          <td>209.070</td>
+          <td>15s</td>
+          <td><span class="badge badge-sucesso">SUCESSO</span></td>
+        </tr>
+        <tr>
+          <td>EMPRESAS_PROTHEUS_RAW</td>
+          <td><span class="badge badge-protheus">PROTHEUS</span></td>
+          <td><span class="badge badge-full">Full</span></td>
+          <td>59</td>
+          <td>59</td>
+          <td>59</td>
+          <td>5s</td>
+          <td><span class="badge badge-sucesso">SUCESSO</span></td>
+        </tr>
+        <tr>
+          <td>FORNECEDOR_PROTHEUS_RAW</td>
+          <td><span class="badge badge-protheus">PROTHEUS</span></td>
+          <td><span class="badge badge-full">Full</span></td>
+          <td>47.878</td>
+          <td>47.878</td>
+          <td>47.878</td>
+          <td>12s</td>
+          <td><span class="badge badge-sucesso">SUCESSO</span></td>
+        </tr>
+        <tr>
+          <td>PRODUTOS_PROTHEUS_RAW</td>
+          <td><span class="badge badge-protheus">PROTHEUS</span></td>
+          <td><span class="badge badge-full">Full</span></td>
+          <td>272.205</td>
+          <td>272.205</td>
+          <td>272.205</td>
+          <td>40s</td>
+          <td><span class="badge badge-sucesso">SUCESSO</span></td>
+        </tr>
+        <tr>
+          <td>NF_ENTRADA_SILT_RAW</td>
+          <td><span class="badge badge-silt">SILT</span></td>
+          <td><span class="badge badge-incremental">Incremental</span></td>
+          <td>520</td>
+          <td>520</td>
+          <td>1.278.599</td>
+          <td>12s</td>
+          <td><span class="badge badge-sucesso">SUCESSO</span></td>
+        </tr>
+        <tr>
+          <td>NF_SAIDA_SILT_RAW</td>
+          <td><span class="badge badge-silt">SILT</span></td>
+          <td><span class="badge badge-incremental">Incremental</span></td>
+          <td>520</td>
+          <td>520</td>
+          <td>1.597.494</td>
+          <td>12s</td>
+          <td><span class="badge badge-sucesso">SUCESSO</span></td>
+        </tr>
+        <tr>
+          <td>SALDO_ESTOQUE_SILT_RAW</td>
+          <td><span class="badge badge-silt">SILT</span></td>
+          <td><span class="badge badge-full">Full</span></td>
+          <td>-</td>
+          <td>-</td>
+          <td>0</td>
+          <td>-</td>
+          <td><span class="badge badge-erro">PENDENTE</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- GRAFICO -->
+  <h2 id="volume-diario">Volume de Registros por Dia</h2>
+  <div class="chart-box"><canvas id="volumeChart"></canvas></div>
+
+  <hr class="divider" />
+
+  <!-- ERROS -->
+  <h2>Alertas Recentes</h2>
+  <div class="alert-box">
+    <strong>SALDO_ESTOQUE_SILT_RAW</strong> (21/08/2026 11:50): API timeout - aguardando retorno da equipe SILT
+  </div>
+
+  <hr class="divider" />
+
+  <!-- CONTROLE DE CARGA -->
+  <h2>Controle de Carga Incremental</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>API</th><th>Ultima Data Carregada</th><th>Atualizado em</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>COMPRAS_PROTHEUS</td><td>2026-08-21</td><td>2026-08-21 06:01</td></tr>
+        <tr><td>NF_ENTRADA</td><td>2026-08-21</td><td>2026-08-21 06:02</td></tr>
+        <tr><td>NF_SAIDA</td><td>2026-08-21</td><td>2026-08-21 06:02</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CHART.JS -->
+  <script src="/libs/chart.js@4.4.4/chart.umd.js"></script>
+  <script>
+    var labels = ['14/08','15/08','16/08','17/08','18/08','19/08','20/08','21/08'];
+    var dataProtheus = [321000, 320800, 321100, 320900, 321050, 320700, 321103, 321143];
+    var dataSilt = [0, 0, 0, 0, 0, 0, 22281, 1040];
+
+    new Chart(document.getElementById('volumeChart'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Protheus', data: dataProtheus, backgroundColor: '#3C3950' },
+          { label: 'SILT', data: dataSilt, backgroundColor: '#ec2849' }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { font: { family: 'Montserrat', weight: '600', size: 12 } } }
+        },
+        scales: {
+          x: { stacked: true, ticks: { font: { family: 'Source Sans Pro' } } },
+          y: { stacked: true, ticks: { font: { family: 'Source Sans Pro' }, callback: function(v) { return (v/1000).toFixed(0) + 'k'; } } }
+        }
+      }
+    });
+  </script>
+
+</body>
+</html>

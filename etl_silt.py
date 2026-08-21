@@ -4,6 +4,7 @@ import csv
 import os
 import sys
 import datetime
+import time
 import requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -80,7 +81,7 @@ def get_headers():
 
 def get_ultima_data(sf_conn, api_name):
     cur = sf_conn.cursor()
-    cur.execute(f"SELECT ULTIMA_DATA_CARGA FROM DRE_AGENTE_ALL.BRONZE.ETL_API_SILT_CONTROL WHERE API_NAME = '{api_name}'")
+    cur.execute(f"SELECT ULTIMA_DATA_CARGA FROM DRE_AGENTE_ALL.BRONZE.ETL_CONTROL WHERE API_NAME = '{api_name}'")
     row = cur.fetchone()
     if row:
         return row[0]
@@ -90,26 +91,37 @@ def get_ultima_data(sf_conn, api_name):
 def set_ultima_data(sf_conn, api_name, data):
     cur = sf_conn.cursor()
     cur.execute(f"""
-        UPDATE DRE_AGENTE_ALL.BRONZE.ETL_API_SILT_CONTROL 
+        UPDATE DRE_AGENTE_ALL.BRONZE.ETL_CONTROL 
         SET ULTIMA_DATA_CARGA = '{data}', UPDATED_AT = CURRENT_TIMESTAMP()
         WHERE API_NAME = '{api_name}'
     """)
 
 
-def chamar_api(endpoint, params=None):
+def chamar_api(endpoint, params=None, max_retries=3):
     url = f'{API_BASE_URL}{endpoint}'
     log(f'Chamando API: {url}')
     if params:
         log(f'Params: {params}')
-    response = requests.get(url, headers=get_headers(), params=params, timeout=900, verify=False)
-    response.raise_for_status()
-    dados = response.json()
-    if isinstance(dados, dict) and 'data' in dados:
-        dados = dados['data']
-    if not isinstance(dados, list):
-        dados = [dados]
-    log(f'Registros retornados: {len(dados)}')
-    return dados
+    
+    for tentativa in range(1, max_retries + 1):
+        try:
+            response = requests.get(url, headers=get_headers(), params=params, timeout=900, verify=False)
+            response.raise_for_status()
+            dados = response.json()
+            if isinstance(dados, dict) and 'data' in dados:
+                dados = dados['data']
+            if not isinstance(dados, list):
+                dados = [dados]
+            log(f'Registros retornados: {len(dados)}')
+            return dados
+        except Exception as e:
+            if tentativa < max_retries:
+                espera = 30 * tentativa
+                log(f'Erro na tentativa {tentativa}/{max_retries}: {e}')
+                log(f'Aguardando {espera}s antes de tentar novamente...')
+                time.sleep(espera)
+            else:
+                raise
 
 
 def salvar_csv(dados, colunas, nome_arquivo):
@@ -176,6 +188,29 @@ def registrar_log(sf_conn, nm_tabela, ds_modo, dt_inicio, dt_fim, qt_extraidos, 
     """)
 
 
+def get_filiais_silt():
+    """Chama API sem filtro para descobrir todos os CNPJs de filiais"""
+    log('Buscando lista de CNPJs na API de saldo-estoque...')
+    dados = chamar_api('/armazem/saldo-estoque')
+    cnpjs = list(set(row.get('ARMAZEM_CNPJCPF') for row in dados if row.get('ARMAZEM_CNPJCPF')))
+    cnpjs.sort()
+    log(f'CNPJs encontrados: {len(cnpjs)}')
+    return cnpjs
+
+
+def get_filiais_fallback(sf_conn):
+    """Fallback: busca CNPJs das tabelas de NF"""
+    cur = sf_conn.cursor()
+    cur.execute("""
+        SELECT DISTINCT ARMAZEM_CNPJCPF FROM (
+            SELECT ARMAZEM_CNPJCPF FROM DRE_AGENTE_ALL.BRONZE.NF_ENTRADA_SILT_RAW
+            UNION
+            SELECT ARMAZEM_CNPJCPF FROM DRE_AGENTE_ALL.BRONZE.NF_SAIDA_SILT_RAW
+        ) WHERE ARMAZEM_CNPJCPF IS NOT NULL
+    """)
+    return [row[0] for row in cur.fetchall()]
+
+
 def processar_saldo_estoque(sf_conn):
     nome = 'SALDO_ESTOQUE_SILT_RAW'
     tabela = f'DRE_AGENTE_ALL.BRONZE.{nome}'
@@ -184,29 +219,68 @@ def processar_saldo_estoque(sf_conn):
 
     log(f'=== {nome} (full load) ===')
     try:
-        params = None
         if MODO_TESTE:
-            params = {'cnpjFilial': CNPJ_TESTE}
-            log(f'MODO TESTE: filtrando por cnpjFilial={CNPJ_TESTE}')
-        dados = chamar_api('/armazem/saldo-estoque', params)
-        if not dados:
-            log('Nenhum dado retornado.')
-            dt_fim = datetime.datetime.now()
-            registrar_log(sf_conn, tabela, 'full', dt_inicio, dt_fim, 0, 0, 0, 'SUCESSO', None, None)
-            return 0
+            filiais = [CNPJ_TESTE]
+            log(f'MODO TESTE: apenas 1 filial')
+        else:
+            # Tenta pegar lista de CNPJs da API
+            try:
+                filiais = get_filiais_silt()
+            except Exception as e:
+                log(f'Falha ao buscar CNPJs da API: {e}')
+                log('Usando fallback (CNPJs das tabelas NF)...')
+                filiais = get_filiais_fallback(sf_conn)
 
-        arquivo = salvar_csv(dados, COLUNAS_SALDO_ESTOQUE, 'saldo_estoque_silt.csv')
-        qt = carregar_snowflake(sf_conn, arquivo, tabela, stage, len(COLUNAS_SALDO_ESTOQUE), COLUNAS_SALDO_ESTOQUE, truncar=True)
+            log(f'Total de filiais: {len(filiais)}')
+
+        # Trunca tabela (full load)
+        sf_cur = sf_conn.cursor()
+        sf_cur.execute(f'TRUNCATE TABLE {tabela}')
+        log('Tabela truncada')
+
+        qt_total = 0
+        total_registros_api = 0
+
+        for i, cnpj in enumerate(filiais, 1):
+            log(f'--- Filial {i}/{len(filiais)}: {cnpj} ---')
+
+            if i > 1:
+                time.sleep(15)
+
+            params = {'cnpjFilial': cnpj}
+            dados = chamar_api('/armazem/saldo-estoque', params)
+
+            if not dados:
+                log(f'Nenhum dado para filial {cnpj}')
+                continue
+
+            total_registros_api += len(dados)
+            arquivo = salvar_csv(dados, COLUNAS_SALDO_ESTOQUE, f'saldo_estoque_silt_{i}.csv')
+            qt = carregar_snowflake(sf_conn, arquivo, tabela, stage, len(COLUNAS_SALDO_ESTOQUE), COLUNAS_SALDO_ESTOQUE, truncar=False)
+            qt_total += qt
 
         dt_fim = datetime.datetime.now()
-        registrar_log(sf_conn, tabela, 'full', dt_inicio, dt_fim, len(dados), len(dados), qt, 'SUCESSO', None, None)
-        return qt
+        registrar_log(sf_conn, tabela, 'full', dt_inicio, dt_fim, total_registros_api, total_registros_api, qt_total, 'SUCESSO', None, f'{len(filiais)} filiais')
+        log(f'{nome} concluido: {qt_total} registros totais')
+        return qt_total
 
     except Exception as e:
         dt_fim = datetime.datetime.now()
         log(f'ERRO: {e}')
         registrar_log(sf_conn, tabela, 'full', dt_inicio, dt_fim, 0, 0, 0, 'ERRO', str(e)[:500], None)
         raise
+
+
+def gerar_periodos_mensais(data_inicio, data_fim):
+    """Gera lista de tuplas (inicio, fim) mes a mes"""
+    periodos = []
+    atual = data_inicio
+    while atual < data_fim:
+        proximo = (atual.replace(day=1) + datetime.timedelta(days=32)).replace(day=1)
+        fim_periodo = min(proximo - datetime.timedelta(days=1), data_fim)
+        periodos.append((atual, fim_periodo))
+        atual = proximo
+    return periodos
 
 
 def processar_nf(sf_conn, tipo):
@@ -228,42 +302,58 @@ def processar_nf(sf_conn, tipo):
             ultima_data = hoje - datetime.timedelta(days=7)
             log(f'MODO TESTE: buscando apenas ultimos 7 dias')
 
-        ds_filtro = f'{ultima_data} a {hoje}'
-        log(f'Periodo: {ds_filtro}')
+        # Se periodo > 31 dias, quebra em meses
+        if (hoje - ultima_data).days > 31:
+            periodos = gerar_periodos_mensais(ultima_data, hoje)
+            log(f'Periodo total: {ultima_data} a {hoje} ({len(periodos)} meses)')
+        else:
+            periodos = [(ultima_data, hoje)]
+            log(f'Periodo: {ultima_data} a {hoje}')
 
-        # Chamar API com intervalo de datas
-        params = {
-            'inicioDataCadastro': str(ultima_data),
-            'finalDataCadastro': str(hoje)
-        }
-        dados = chamar_api(endpoint, params)
-
-        if not dados:
-            log('Nenhum dado retornado.')
-            dt_fim = datetime.datetime.now()
-            registrar_log(sf_conn, tabela, 'incremental', dt_inicio, dt_fim, 0, 0, 0, 'SUCESSO', None, ds_filtro)
-            return 0
-
-        arquivo = salvar_csv(dados, COLUNAS_NF, f'nf_{tipo.lower()}_silt.csv')
-
-        # Deleta registros do periodo para evitar duplicatas
+        # Deleta registros do periodo completo para evitar duplicatas
         sf_cur = sf_conn.cursor()
         sf_cur.execute(f"DELETE FROM {tabela} WHERE DATA_CADASTRO >= '{ultima_data}'")
         qt_deletados = sf_cur.fetchone()[0]
         log(f'Deletados: {qt_deletados} registros do periodo')
 
-        qt = carregar_snowflake(sf_conn, arquivo, tabela, stage, len(COLUNAS_NF), COLUNAS_NF, truncar=False)
+        qt_total = 0
+        total_registros_api = 0
+
+        for i, (dt_de, dt_ate) in enumerate(periodos, 1):
+            log(f'--- Mes {i}/{len(periodos)}: {dt_de} a {dt_ate} ---')
+
+            # Delay entre chamadas para evitar rate limiting
+            if i > 1:
+                time.sleep(15)
+
+            params = {
+                'inicioDataCadastro': str(dt_de),
+                'finalDataCadastro': str(dt_ate)
+            }
+            dados = chamar_api(endpoint, params)
+
+            if not dados:
+                log(f'Nenhum dado para {dt_de} a {dt_ate}')
+                continue
+
+            total_registros_api += len(dados)
+            arquivo = salvar_csv(dados, COLUNAS_NF, f'nf_{tipo.lower()}_silt_{i}.csv')
+            qt = carregar_snowflake(sf_conn, arquivo, tabela, stage, len(COLUNAS_NF), COLUNAS_NF, truncar=False)
+            qt_total += qt
 
         # Atualiza controle
         set_ultima_data(sf_conn, api_name, str(hoje))
 
+        ds_filtro = f'{ultima_data} a {hoje} ({len(periodos)} meses)'
         dt_fim = datetime.datetime.now()
-        registrar_log(sf_conn, tabela, 'incremental', dt_inicio, dt_fim, len(dados), qt_deletados, qt, 'SUCESSO', None, ds_filtro)
-        return qt
+        registrar_log(sf_conn, tabela, 'incremental', dt_inicio, dt_fim, total_registros_api, qt_deletados, qt_total, 'SUCESSO', None, ds_filtro)
+        log(f'{nome} concluido: {qt_total} registros totais')
+        return qt_total
 
     except Exception as e:
         dt_fim = datetime.datetime.now()
         log(f'ERRO: {e}')
+        ds_filtro = f'{ultima_data} a {hoje}' if 'ultima_data' in dir() else None
         registrar_log(sf_conn, tabela, 'incremental', dt_inicio, dt_fim, 0, 0, 0, 'ERRO', str(e)[:500], ds_filtro)
         raise
 
@@ -282,7 +372,8 @@ if __name__ == '__main__':
     sf_conn = conectar_snowflake()
     try:
         total = 0
-        if apenas is None or apenas == 'SALDO_ESTOQUE':
+        # SALDO_ESTOQUE desabilitado ate resolver timeout com equipe SILT
+        if apenas == 'SALDO_ESTOQUE':
             total += processar_saldo_estoque(sf_conn)
         if apenas is None or apenas == 'NF_ENTRADA':
             total += processar_nf(sf_conn, 'ENTRADA')

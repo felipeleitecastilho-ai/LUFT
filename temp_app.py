@@ -112,7 +112,7 @@ if not total_hoje.empty:
     elif filtro_fonte == "Somente Erros":
         df_display = df_display[df_display['Status'] == 'ERRO']
 
-    st.dataframe(df_display, use_container_width=True)
+    st.dataframe(df_display, use_container_width=True, hide_index=True)
 else:
     st.info("Nenhuma execucao hoje ainda.")
 
@@ -128,7 +128,7 @@ df_diario = df_log.groupby(['DATA', 'FONTE'])['QT_CARREGADOS'].sum().reset_index
 df_pivot = df_diario.pivot(index='DATA', columns='FONTE', values='QT_CARREGADOS').fillna(0)
 df_pivot = df_pivot.sort_index()
 
-st.bar_chart(df_pivot, use_container_width=True)
+st.bar_chart(df_pivot, use_container_width=True, color=['#3C3950', '#ec2849'])
 
 st.divider()
 
@@ -138,7 +138,7 @@ st.subheader("Controle de Carga Incremental")
 if not df_control.empty:
     df_ctrl_display = df_control.copy()
     df_ctrl_display.columns = ['API', 'Ultima Data Carregada', 'Atualizado em']
-    st.dataframe(df_ctrl_display, use_container_width=True)
+    st.dataframe(df_ctrl_display, use_container_width=True, hide_index=True)
 
 st.divider()
 
@@ -153,7 +153,7 @@ status_filter = st.selectbox("Filtrar por status:", ["Todos", "SUCESSO", "ERRO"]
 if status_filter != "Todos":
     df_hist = df_hist[df_hist['Status'] == status_filter]
 
-st.dataframe(df_hist, use_container_width=True)
+st.dataframe(df_hist, use_container_width=True, hide_index=True)
 
 # === ALERTAS DE ERRO ===
 erros_recentes = df_log[df_log['DS_STATUS'] == 'ERRO'].head(5)
@@ -162,4 +162,5 @@ if not erros_recentes.empty:
     st.subheader("Alertas Recentes")
     for _, row in erros_recentes.iterrows():
         st.error(f"**{row['NM_TABELA'].replace('DRE_AGENTE_ALL.BRONZE.', '')}** ({row['DT_INICIO']}): {row['DS_ERRO']}")
+
 
