@@ -155,7 +155,60 @@ __pycache__/
 
 ---
 
-## 6. Checklist novo projeto Snowflake + Agent
+## 6. Setup Inicial de Projeto (fazer PRIMEIRO)
+
+### Ao iniciar qualquer projeto novo:
+1. Criar pasta no repositorio Git
+2. Criar .gitignore imediatamente:
+```
+# Credenciais
+*.p8
+*.pem
+*.key
+snowflake_key*
+credentials*
+.env
+
+# Backups e temp
+backup_*
+temp/
+__pycache__/
+*.pyc
+
+# Dados grandes
+*.csv
+*.xlsx
+*.gz
+
+# OS
+.DS_Store
+Thumbs.db
+```
+3. Criar estrutura de pastas:
+```
+PROJETO/
+├── scripts_etl/
+├── docs/
+├── streamlit/
+├── dados_csv/
+├── backups/
+└── .gitignore
+```
+4. Fazer commit inicial: `git init && git add .gitignore && git commit -m "Initial commit"`
+5. Criar repositorio remoto e fazer push
+
+### Regras de Git durante o projeto:
+- **SEMPRE perguntar antes de commitar** (nunca fazer commit automatico)
+- **SEMPRE perguntar antes de push** (usuario pode querer revisar)
+- **Nunca commitar arquivos auxiliares de debug** (test_*.py, ver_*.py)
+- **Nunca commitar credenciais** (.p8, .env, passwords)
+- **Um commit por entrega logica** (nao por arquivo individual)
+- **Mensagem em portugues** se projeto BR
+- **Organizar pastas ANTES do commit final** (nao deixar bagunca no repo)
+
+---
+
+## 7. Checklist novo projeto Snowflake + Agent
 
 - [ ] Definir fontes de dados e volumes
 - [ ] Criar database + schemas (BRONZE, SILVER, GOLD)
