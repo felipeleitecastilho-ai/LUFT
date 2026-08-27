@@ -42,6 +42,8 @@ CREATE OR REPLACE AGENT schema.nome
 - CREATE OR REPLACE perde os GRANTs existentes
 - Sempre re-aplicar GRANT USAGE apos recriar o agente
 - Future grants NAO se aplicam a agentes (somente views, tables, semantic views)
+- **Cortex Agent usa DEFAULT_ROLE do usuario** (nao a role ativa na sessao)
+- Se usuario reclama erro de acesso no agente: `SHOW USERS LIKE 'NOME'` → verificar default_role
 
 ---
 
@@ -117,12 +119,14 @@ CREATE OR REPLACE AGENT schema.nome
 ### Fluxo ideal para nova fonte de dados:
 1. Listar tabelas/colunas disponiveis
 2. Usuario escolhe quais quer
-3. Verificar volume e formato de datas
-4. Definir modo (full/incremental) por tabela
-5. Implementar script + tabelas Bronze
-6. Testar com --apenas=UMA_TABELA
-7. Rodar completo
-8. Confirmar com usuario
+3. **Verificar COUNT(*) ANTES de extrair** (evitar surpresa 287M!)
+4. Verificar volume e formato de datas
+5. Definir modo (full/incremental) por tabela
+6. Implementar script + tabelas Bronze
+7. Testar com --apenas=UMA_TABELA
+8. Rodar completo
+9. Confirmar com usuario
+10. **Testar agente no Snowsight (aba Preview)** antes de entregar
 
 ---
 

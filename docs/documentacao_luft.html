@@ -125,6 +125,7 @@
     <a href="#adicionar-dados">8. Como Adicionar Novos Dados</a>
     <a href="#manutencao">9. Manutenção Diária</a>
     <a href="#contatos">10. Contatos e Suporte</a>
+    <a href="#pendencias">11. Pendências Futuras e Limitações</a>
     <a href="#glossario">Glossário</a>
   </div>
 
@@ -323,6 +324,11 @@ python etl_tms.py --apenas=OCORRENCIAS_SAC_TMS_RAW</pre>
     <li>Dynamic Tables agregadas (DRE, Razão, Frota)</li>
     <li>Nomes de colunas amigáveis e em português</li>
   </ul>
+  <p><strong>View principal de Compras:</strong> <code>VW_COMPRAS_PROTHEUS</code></p>
+  <ul>
+    <li>45 campos enriquecidos (JOINs com Empresas, Fornecedor, Produtos)</li>
+    <li>Dados direto do ERP com fornecedor, CNPJ, conta contábil, centro de custo</li>
+  </ul>
 
   <!-- 5. CORTEX AGENT -->
   <h2 id="cortex-agent">5. Cortex Agent (DRE_FILIAIS)</h2>
@@ -396,6 +402,9 @@ LIMIT 20;</pre>
   <div class="warning">
     <strong>Importante:</strong> Não use ACCOUNTADMIN no dia a dia. Use ROLE_LUFT_ADMIN.
   </div>
+  <div class="tip">
+    <strong>Sobre o Agente:</strong> O Cortex Agent usa a <strong>default_role</strong> do usuário, não a role ativa na sessão. Se o agente der erro de acesso, verifique a default_role do usuário com: <code>SHOW USERS LIKE 'NOME'</code>
+  </div>
 
   <!-- 8. ADICIONAR DADOS -->
   <h2 id="adicionar-dados">8. Como Adicionar Novos Dados</h2>
@@ -421,10 +430,12 @@ LIMIT 20;</pre>
   <ol>
     <li>Criar View Gold com nomes amigáveis em português</li>
     <li>Criar Semantic View com FACTS e DIMENSIONS</li>
-    <li>Alterar o agente adicionando nova ferramenta</li>
+    <li>Recriar o agente com <code>CREATE OR REPLACE AGENT ... FROM SPECIFICATION $$ YAML $$</code></li>
+    <li>Re-aplicar GRANT USAGE no agente para cada role</li>
+    <li>Testar no Snowsight (aba Preview) antes de liberar</li>
   </ol>
-  <div class="tip">
-    <strong>Dica:</strong> Use as semantic views existentes como modelo para criar novas.
+  <div class="warning">
+    <strong>Atenção:</strong> Fazer backup da spec do agente ANTES de alterar. O CREATE OR REPLACE apaga grants e versões anteriores.
   </div>
 
   <!-- 9. MANUTENÇÃO -->
@@ -450,6 +461,24 @@ LIMIT 20;</pre>
         <tr><td>Alynne (Luft)</td><td>Administradora do ambiente</td><td><a href="mailto:alynne.oya@luftsolutions.com.br">alynne.oya@luftsolutions.com.br</a></td></tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- 11. PENDENCIAS FUTURAS -->
+  <h2 id="pendencias">11. Pendências Futuras e Limitações</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Item</th><th>Status</th><th>Dependência</th></tr></thead>
+      <tbody>
+        <tr><td>API Wiser (saldo-estoque Ibiporã/Barueri)</td><td>Aguardando token</td><td>Wiser precisa criar o token de acesso</td></tr>
+        <tr><td>PositionHistory_IIPOS (287M registros)</td><td>Carrega apenas 7 dias</td><td>Volume muito grande para full load</td></tr>
+        <tr><td>Telemetry (Exporta)</td><td>Removida</td><td>Dados antigos (2023-2024), sem atualização</td></tr>
+        <tr><td>Roles DRE (Agro, Ecommerce, Logistica, CEO)</td><td>Criadas sem usuários</td><td>Alynne definir quem usa cada role</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="warning">
+    <strong>Credenciais TMS (para troubleshooting):</strong><br>
+    Servidor: <code>10.1.11.11</code> | Usuário: <code>bi.zoho</code> | Database principal: <code>dtbTransporte</code>
   </div>
 
   <!-- GLOSSÁRIO -->
