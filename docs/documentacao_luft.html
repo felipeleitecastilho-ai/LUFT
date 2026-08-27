@@ -409,7 +409,27 @@ LIMIT 20;</pre>
   <!-- 8. ADICIONAR DADOS -->
   <h2 id="adicionar-dados">8. Como Adicionar Novos Dados</h2>
 
-  <h3>8.1 Nova planilha CSV</h3>
+  <h3>8.1 Adicionar dados em tabela que já existe</h3>
+  <p>Para carregar novos dados numa tabela Bronze que já existe (ex: novo mês do Razão):</p>
+  <ol>
+    <li>Converter o arquivo para CSV (UTF-8, separador vírgula)</li>
+    <li>Subir para o stage na mesma pasta da tabela:
+      <pre>PUT file://C:/caminho/arquivo.csv @DRE_AGENTE_ALL.BRONZE.STG_LANDING/pasta/;</pre>
+    </li>
+    <li>Carregar na tabela existente:
+      <pre>COPY INTO DRE_AGENTE_ALL.BRONZE.NOME_DA_TABELA_RAW
+FROM @DRE_AGENTE_ALL.BRONZE.STG_LANDING/pasta/
+FILE_FORMAT = (FORMAT_NAME = 'DRE_AGENTE_ALL.BRONZE.CSV_FORMAT');</pre>
+    </li>
+  </ol>
+  <div class="tip">
+    <strong>Dica:</strong> O Silver e Gold atualizam sozinhos (Dynamic Tables). Após o COPY INTO, basta aguardar alguns minutos.
+  </div>
+  <div class="warning">
+    <strong>Cuidado:</strong> O CSV precisa ter as mesmas colunas e na mesma ordem da tabela. Se o formato mudou, verifique com: <code>DESCRIBE TABLE nome_tabela;</code>
+  </div>
+
+  <h3>8.2 Nova planilha CSV (tabela nova)</h3>
   <ol>
     <li>Converter para CSV (UTF-8, separador vírgula)</li>
     <li>Subir para o stage:
@@ -419,14 +439,14 @@ LIMIT 20;</pre>
     <li>Carregar dados com COPY INTO</li>
   </ol>
 
-  <h3>8.2 Nova fonte API/banco</h3>
+  <h3>8.3 Nova fonte API/banco</h3>
   <ol>
     <li>Criar script Python seguindo padrão dos existentes</li>
     <li>Adicionar chamada no <code>executar_etl.bat</code></li>
     <li>Testar manualmente antes de automatizar</li>
   </ol>
 
-  <h3>8.3 Levar até o agente</h3>
+  <h3>8.4 Levar até o agente</h3>
   <ol>
     <li>Criar View Gold com nomes amigáveis em português</li>
     <li>Criar Semantic View com FACTS e DIMENSIONS</li>
