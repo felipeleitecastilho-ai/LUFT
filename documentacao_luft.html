@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="snowflake-source" content="cortex-agent-authored" />
+  <title>Documentação Técnica - Projeto Data Lakehouse Luft Logistics</title>
+  <script type="application/json" id="snowflake-report-metadata">
+  {
+    "generated": "2026-08-26",
+    "intent": "Documentação técnica de handover do projeto Data Lakehouse Luft Logistics para administração por equipe não-técnica",
+    "sections": [
+      { "id": "visao-geral", "title": "Visão Geral do Projeto", "dataSources": [], "producerNotes": "Descrição estática da arquitetura do projeto." },
+      { "id": "fontes-dados", "title": "Fontes de Dados", "dataSources": [], "producerNotes": "Inventário das fontes de dados e frequência de carga." },
+      { "id": "etl-scripts", "title": "ETL - Scripts Python", "dataSources": [], "producerNotes": "Instruções operacionais dos scripts ETL." },
+      { "id": "snowflake-camadas", "title": "Snowflake - Camadas", "dataSources": [{"type": "query", "sql": "SELECT * FROM DRE_AGENTE_ALL.BRONZE.ETL_LOG ORDER BY DT_INICIO DESC LIMIT 20"}], "producerNotes": "Inventário de tabelas Bronze, Silver e Gold." },
+      { "id": "cortex-agent", "title": "Cortex Agent", "dataSources": [], "producerNotes": "Descrição das ferramentas do agente DRE_FILIAIS." },
+      { "id": "monitoramento", "title": "Monitoramento", "dataSources": [], "producerNotes": "Painel Streamlit e alertas configurados." },
+      { "id": "acessos-roles", "title": "Acessos e Roles", "dataSources": [], "producerNotes": "Estrutura de roles e permissões." },
+      { "id": "adicionar-dados", "title": "Como Adicionar Novos Dados", "dataSources": [], "producerNotes": "Guia passo a passo para expansão." },
+      { "id": "manutencao", "title": "Manutenção Diária", "dataSources": [], "producerNotes": "Checklist operacional diário." },
+      { "id": "contatos", "title": "Contatos e Suporte", "dataSources": [], "producerNotes": "Responsáveis pelo projeto." }
+    ]
+  }
+  </script>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, system-ui, 'Segoe UI', sans-serif;
+      max-width: 900px; width: 100%;
+      margin: 0 auto; padding: clamp(16px, 4vw, 24px);
+      color: light-dark(#2d2d2d, #e5e7eb);
+      background: light-dark(#ffffff, #1a1a2e);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    h1 { color: #ec2849; font-size: 1.8em; margin-bottom: 0.3em; }
+    h2 { color: #ec2849; font-size: 1.4em; border-bottom: 2px solid #ec2849; padding-bottom: 6px; margin-top: 2em; }
+    h3 { color: #003366; font-size: 1.1em; margin-top: 1.5em; }
+    a { color: light-dark(#0066CC, #60a5fa); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    img, svg { max-width: 100%; height: auto; }
+    .chart-box { position: relative; width: 100%; height: 320px; }
+    .chart-box > canvas { width: 100% !important; height: 100% !important; }
+    .table-wrap { overflow-x: auto; margin: 12px 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border: 1px solid light-dark(#d1d5db, #374151); padding: 8px 10px; text-align: left; }
+    th { background: light-dark(#f0f4f8, #2a2a40); font-weight: 600; color: light-dark(#003366, #e5e7eb); }
+    tr:nth-child(even) { background: light-dark(#f9fafb, #22223a); }
+    code, pre {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      background: light-dark(#f3f4f6, #2a2a40);
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    code { padding: 2px 6px; }
+    pre { padding: 12px 16px; overflow-x: auto; border-left: 3px solid #ec2849; }
+    .capa {
+      text-align: center;
+      padding: 40px 20px;
+      border: 2px solid light-dark(#e5e7eb, #374151);
+      border-radius: 12px;
+      margin-bottom: 30px;
+      background: light-dark(#fafbfc, #22223a);
+    }
+    .capa-title { font-size: 1.6em; color: #ec2849; margin: 20px 0 5px; font-weight: 700; }
+    .capa-subtitle { font-size: 1.1em; color: light-dark(#003366, #8899bb); margin-bottom: 20px; }
+    .capa-meta { font-size: 0.9em; color: light-dark(#555, #aaa); margin-top: 15px; }
+    .logos { display: flex; justify-content: center; align-items: center; gap: 40px; margin: 20px 0; flex-wrap: wrap; }
+    .sumario { background: light-dark(#f0f4f8, #22223a); padding: 20px; border-radius: 8px; margin: 20px 0; }
+    .sumario a { display: block; padding: 4px 0; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .badge-bronze { background: #cd7f32; color: white; }
+    .badge-silver { background: #a0a0a0; color: white; }
+    .badge-gold { background: #d4a017; color: white; }
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { padding: 6px 0; border-bottom: 1px solid light-dark(#eee, #333); }
+    .checklist li::before { content: "☐ "; font-size: 1.1em; }
+    .tip { background: light-dark(#e8f4fd, #1a3a5c); border-left: 4px solid #0066CC; padding: 10px 14px; border-radius: 4px; margin: 12px 0; font-size: 14px; }
+    .warning { background: light-dark(#fff3e0, #3d2a00); border-left: 4px solid #ec2849; padding: 10px 14px; border-radius: 4px; margin: 12px 0; font-size: 14px; }
+    .diagram-container { overflow-x: auto; padding: 10px 0; }
+    .glossary dt { font-weight: 700; color: #ec2849; margin-top: 10px; }
+    .glossary dd { margin-left: 0; margin-bottom: 8px; padding-left: 16px; border-left: 2px solid light-dark(#ddd, #444); }
+    @media (max-width: 600px) {
+      .capa { padding: 20px 10px; }
+      .logos { gap: 20px; }
+      h1 { font-size: 1.4em; }
+      h2 { font-size: 1.2em; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CAPA -->
+  <div class="capa">
+    <div class="logos">
+      <svg width="120" height="40" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg">
+        <rect width="120" height="40" rx="6" fill="#003366"/>
+        <text x="60" y="26" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="700" fill="white">KEYRUS</text>
+      </svg>
+      <svg width="120" height="40" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg">
+        <rect width="120" height="40" rx="6" fill="#3C3950"/>
+        <text x="60" y="26" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="700" fill="#ec2849">LUFT</text>
+      </svg>
+    </div>
+    <div class="capa-title">Documentação Técnica<br>Projeto Data Lakehouse Luft Logistics</div>
+    <div class="capa-subtitle">Guia de Administração e Manutenção</div>
+    <div class="capa-meta">
+      <strong>Data:</strong> Agosto 2026<br>
+      <strong>Cliente:</strong> Luft Logistics &nbsp;|&nbsp; <strong>Parceiro:</strong> Keyrus
+    </div>
+  </div>
+
+  <!-- SUMÁRIO -->
+  <h2 id="sumario">Sumário</h2>
+  <div class="sumario">
+    <a href="#visao-geral">1. Visão Geral do Projeto</a>
+    <a href="#fontes-dados">2. Fontes de Dados</a>
+    <a href="#etl-scripts">3. ETL - Scripts Python</a>
+    <a href="#snowflake-camadas">4. Snowflake - Camadas</a>
+    <a href="#cortex-agent">5. Cortex Agent (DRE_FILIAIS)</a>
+    <a href="#monitoramento">6. Monitoramento</a>
+    <a href="#acessos-roles">7. Acessos e Roles</a>
+    <a href="#adicionar-dados">8. Como Adicionar Novos Dados</a>
+    <a href="#manutencao">9. Manutenção Diária</a>
+    <a href="#contatos">10. Contatos e Suporte</a>
+    <a href="#glossario">Glossário</a>
+  </div>
+
+  <!-- 1. VISÃO GERAL -->
+  <h2 id="visao-geral">1. Visão Geral do Projeto</h2>
+  <p>Este projeto criou um Data Lakehouse na Luft Logistics.</p>
+  <p><strong>O que foi construído:</strong></p>
+  <ul>
+    <li>Ingestão automática de 4 fontes de dados (Oracle, API, SQL Server, CSVs)</li>
+    <li>37 tabelas Bronze com dados brutos no Snowflake</li>
+    <li>Transformações automáticas via Dynamic Tables (Silver e Gold)</li>
+    <li>Agente de IA que responde perguntas financeiras e operacionais</li>
+  </ul>
+
+  <p><strong>Arquitetura:</strong> Bronze → Silver → Gold → Agente</p>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:880px;height:auto;">
+      <!-- Fontes -->
+      <rect x="10" y="30" width="130" height="160" rx="8" fill="light-dark(#f0f4f8, #2a2a40)" stroke="#003366" stroke-width="2"/>
+      <text x="75" y="22" text-anchor="middle" font-size="11" font-weight="700" fill="#003366">FONTES</text>
+      <text x="75" y="55" text-anchor="middle" font-size="10" fill="light-dark(#333,#ccc)">Oracle (Protheus)</text>
+      <text x="75" y="80" text-anchor="middle" font-size="10" fill="light-dark(#333,#ccc)">API SILT</text>
+      <text x="75" y="105" text-anchor="middle" font-size="10" fill="light-dark(#333,#ccc)">SQL Server (TMS)</text>
+      <text x="75" y="130" text-anchor="middle" font-size="10" fill="light-dark(#333,#ccc)">CSVs Manuais</text>
+      <!-- Arrow 1 -->
+      <polygon points="150,110 170,100 170,105 190,105 190,115 170,115 170,120" fill="#003366"/>
+      <!-- ETL -->
+      <rect x="195" y="75" width="100" height="70" rx="8" fill="#003366" stroke="#003366" stroke-width="2"/>
+      <text x="245" y="108" text-anchor="middle" font-size="11" font-weight="700" fill="white">ETL Python</text>
+      <text x="245" y="125" text-anchor="middle" font-size="9" fill="#ccc">Scripts .py</text>
+      <!-- Arrow 2 -->
+      <polygon points="300,110 320,100 320,105 340,105 340,115 320,115 320,120" fill="#cd7f32"/>
+      <!-- Bronze -->
+      <rect x="345" y="75" width="95" height="70" rx="8" fill="#cd7f32" stroke="#cd7f32" stroke-width="2"/>
+      <text x="392" y="105" text-anchor="middle" font-size="11" font-weight="700" fill="white">BRONZE</text>
+      <text x="392" y="122" text-anchor="middle" font-size="9" fill="white">37 tabelas _RAW</text>
+      <!-- Arrow 3 -->
+      <polygon points="445,110 465,100 465,105 485,105 485,115 465,115 465,120" fill="#a0a0a0"/>
+      <!-- Silver -->
+      <rect x="490" y="75" width="95" height="70" rx="8" fill="#a0a0a0" stroke="#a0a0a0" stroke-width="2"/>
+      <text x="537" y="105" text-anchor="middle" font-size="11" font-weight="700" fill="white">SILVER</text>
+      <text x="537" y="122" text-anchor="middle" font-size="9" fill="white">Dynamic Tables</text>
+      <!-- Arrow 4 -->
+      <polygon points="590,110 610,100 610,105 630,105 630,115 610,115 610,120" fill="#d4a017"/>
+      <!-- Gold -->
+      <rect x="635" y="75" width="95" height="70" rx="8" fill="#d4a017" stroke="#d4a017" stroke-width="2"/>
+      <text x="682" y="105" text-anchor="middle" font-size="11" font-weight="700" fill="white">GOLD</text>
+      <text x="682" y="122" text-anchor="middle" font-size="9" fill="white">Views + Semantic</text>
+      <!-- Arrow 5 -->
+      <polygon points="735,110 755,100 755,105 775,105 775,115 755,115 755,120" fill="#ec2849"/>
+      <!-- Agente -->
+      <rect x="780" y="75" width="90" height="70" rx="8" fill="#ec2849" stroke="#ec2849" stroke-width="2"/>
+      <text x="825" y="105" text-anchor="middle" font-size="11" font-weight="700" fill="white">AGENTE</text>
+      <text x="825" y="122" text-anchor="middle" font-size="9" fill="white">Cortex AI</text>
+    </svg>
+  </div>
+
+  <!-- 2. FONTES DE DADOS -->
+  <h2 id="fontes-dados">2. Fontes de Dados</h2>
+  <p>O sistema extrai dados de 4 fontes diferentes.</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Fonte</th><th>Sistema</th><th>O que extrai</th><th>Frequência</th><th>Modo</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Protheus (Oracle)</td><td>ERP</td><td>Compras, Empresas, Fornecedor, Produtos</td><td>Diário 06:00</td><td>Incremental</td></tr>
+        <tr><td>SILT (API)</td><td>Plataforma Luft</td><td>NF Entrada, NF Saída, Saldo Estoque</td><td>Diário 06:00</td><td>Incremental / Full</td></tr>
+        <tr><td>TMS/Zoho (SQL Server)</td><td>Zoho TMS</td><td>14 tabelas (Ocorrências, Ordens, Manifestos, GPS)</td><td>Diário 06:00</td><td>Full / Incremental / 7 dias</td></tr>
+        <tr><td>CSVs manuais</td><td>Planilhas</td><td>DRE, Razão, Frota, Produtividade, etc.</td><td>Manual</td><td>Upload stage</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 3. ETL -->
+  <h2 id="etl-scripts">3. ETL - Scripts Python</h2>
+  <p>Os scripts ficam no servidor Windows da Luft.</p>
+  <p><strong>Localização:</strong> <code>C:\Users\keyrus\etl_luft\</code></p>
+
+  <h3>3.1 Arquivos no servidor</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Arquivo</th><th>O que faz</th></tr></thead>
+      <tbody>
+        <tr><td><code>executar_etl.bat</code></td><td>Roda os 3 ETLs em sequência (agendado 06:00)</td></tr>
+        <tr><td><code>etl_protheus.py</code></td><td>Extrai Oracle Protheus → Bronze</td></tr>
+        <tr><td><code>etl_silt.py</code></td><td>Extrai API SILT → Bronze</td></tr>
+        <tr><td><code>etl_tms.py</code></td><td>Extrai SQL Server TMS → Bronze</td></tr>
+        <tr><td><code>snowflake_key.p8</code></td><td>Chave privada de autenticação no Snowflake</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.2 Como rodar manualmente</h3>
+  <p>Abra o Prompt de Comando e digite:</p>
+  <pre>cd C:\Users\keyrus\etl_luft
+python etl_protheus.py
+python etl_silt.py
+python etl_tms.py</pre>
+
+  <h3>3.3 Rodar apenas uma tabela</h3>
+  <p>Use o parâmetro <code>--apenas</code> para rodar uma tabela específica:</p>
+  <pre>python etl_silt.py --apenas=NF_ENTRADA
+python etl_tms.py --apenas=OCORRENCIAS_SAC_TMS_RAW</pre>
+
+  <h3>3.4 Se der erro</h3>
+  <div class="warning">
+    <strong>Passos para resolver erros:</strong>
+  </div>
+  <ol>
+    <li>Verificar o painel Streamlit ou a tabela ETL_LOG</li>
+    <li>Rodar manualmente o script que falhou</li>
+    <li>Erros comuns:
+      <ul>
+        <li><strong>Timeout API:</strong> esperar 5 minutos e tentar de novo</li>
+        <li><strong>SQL Server offline:</strong> verificar se o servidor TMS está acessível na rede</li>
+      </ul>
+    </li>
+  </ol>
+
+  <!-- 4. SNOWFLAKE CAMADAS -->
+  <h2 id="snowflake-camadas">4. Snowflake - Camadas</h2>
+
+  <h3>4.1 Bronze (dados brutos) <span class="badge badge-bronze">BRONZE</span></h3>
+  <p>37 tabelas com sufixo <code>_RAW</code>. Dados exatamente como vieram da fonte.</p>
+  <p>Tabelas de controle: <code>ETL_CONTROL</code> (datas) e <code>ETL_LOG</code> (histórico).</p>
+
+  <p><strong>Protheus (Oracle):</strong></p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tabela</th><th>Registros</th></tr></thead>
+      <tbody>
+        <tr><td>COMPRAS_PROTHEUS_RAW</td><td>~210.000</td></tr>
+        <tr><td>EMPRESAS_PROTHEUS_RAW</td><td>59</td></tr>
+        <tr><td>FORNECEDOR_PROTHEUS_RAW</td><td>~47.000</td></tr>
+        <tr><td>PRODUTOS_PROTHEUS_RAW</td><td>~272.000</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>SILT (API):</strong></p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tabela</th><th>Registros</th></tr></thead>
+      <tbody>
+        <tr><td>NF_ENTRADA_SILT_RAW</td><td>~1.200.000</td></tr>
+        <tr><td>NF_SAIDA_SILT_RAW</td><td>~1.600.000</td></tr>
+        <tr><td>SALDO_ESTOQUE_SILT_RAW</td><td>~145.000</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>TMS (SQL Server):</strong></p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tabela</th><th>Registros</th></tr></thead>
+      <tbody>
+        <tr><td>OCORRENCIAS_SAC_TMS_RAW</td><td>~760.000</td></tr>
+        <tr><td>ORDENS_SERVICO_TMS_RAW</td><td>~89.000</td></tr>
+        <tr><td>INFORMATION_REGIONS_TMS_RAW</td><td>~2.200.000</td></tr>
+        <tr><td>POSITION_HISTORY_TMS_RAW</td><td>~1.300.000</td></tr>
+        <tr><td>MANIFESTOS_OPS_RENTABILIDADE_TMS_RAW</td><td>~19.000</td></tr>
+        <tr><td colspan="2"><em>+ 8 tabelas menores</em></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>CSVs (Planilhas):</strong></p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tabela</th><th>Registros</th></tr></thead>
+      <tbody>
+        <tr><td>COMPRAS_CONTABIL_RAW</td><td>~301.000</td></tr>
+        <tr><td>CARGA_TRANSPORTE_RAW</td><td>~150.000</td></tr>
+        <tr><td>ABASTECIMENTOS_RAW</td><td>~31.000</td></tr>
+        <tr><td>RAZAO_AGRO_RAW</td><td>~26.000</td></tr>
+        <tr><td>DRE_RAW</td><td>~11.000</td></tr>
+        <tr><td colspan="2"><em>+ 8 tabelas menores</em></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>4.2 Silver (dados limpos) <span class="badge badge-silver">SILVER</span></h3>
+  <p>13 Dynamic Tables que atualizam automaticamente.</p>
+  <ul>
+    <li>Conversão de tipos: texto → data, texto → número</li>
+    <li>Limpeza: TRIM, padronização de nomes</li>
+    <li>Não precisa de ação manual. Atualizam sozinhas.</li>
+  </ul>
+
+  <h3>4.3 Gold (dados para consumo) <span class="badge badge-gold">GOLD</span></h3>
+  <p>Camada final. É o que os usuários consultam.</p>
+  <ul>
+    <li>Views semânticas para o agente de IA</li>
+    <li>Dynamic Tables agregadas (DRE, Razão, Frota)</li>
+    <li>Nomes de colunas amigáveis e em português</li>
+  </ul>
+
+  <!-- 5. CORTEX AGENT -->
+  <h2 id="cortex-agent">5. Cortex Agent (DRE_FILIAIS)</h2>
+  <p>O agente de IA responde perguntas sobre a Luft.</p>
+  <p>Ele tem 7 ferramentas. Cada uma responde um tipo de pergunta.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ferramenta</th><th>O que responde</th><th>Exemplos de perguntas</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Analista_Financeiro</strong></td><td>EBITDA, receita, custos, margem</td><td>"Qual o EBITDA de Barueri?"</td></tr>
+        <tr><td><strong>Analista_Frota</strong></td><td>Km rodados, combustível, custo/km</td><td>"Qual o custo por km?"</td></tr>
+        <tr><td><strong>Analista_Frota_Cadastro</strong></td><td>Veículos, placas, modelos</td><td>"Quantos veículos próprios?"</td></tr>
+        <tr><td><strong>Analista_Empilhadeira</strong></td><td>Equipamentos, locação</td><td>"Custo total de locação?"</td></tr>
+        <tr><td><strong>Analista_Razao_Logistico</strong></td><td>Lançamentos contábeis</td><td>"Maiores gastos por conta?"</td></tr>
+        <tr><td><strong>Analista_Contratos</strong></td><td>Vigência, reajuste, SLA</td><td>"Quando vence o contrato X?"</td></tr>
+        <tr><td><strong>Analista_Compras</strong></td><td>Fornecedores, produtos, valores</td><td>"Qual fornecedor compro mais?"</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Como funciona:</h3>
+  <ol>
+    <li>Você faz uma pergunta em linguagem natural</li>
+    <li>O agente identifica qual ferramenta usar</li>
+    <li>A ferramenta consulta a semantic view correta</li>
+    <li>Retorna a resposta com dados reais do Snowflake</li>
+  </ol>
+  <div class="tip">
+    <strong>Dica:</strong> Quanto mais específica a pergunta, melhor a resposta. Inclua filial, período ou métrica.
+  </div>
+
+  <!-- 6. MONITORAMENTO -->
+  <h2 id="monitoramento">6. Monitoramento</h2>
+
+  <h3>6.1 Painel Streamlit</h3>
+  <p><strong>Acesso:</strong> Snowsight → Streamlit → PAINEL_ETL_LUFT</p>
+  <p>O painel mostra: status das cargas, erros e histórico.</p>
+
+  <h3>6.2 Alertas por email</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Horário</th><th>Tipo</th><th>O que informa</th></tr></thead>
+      <tbody>
+        <tr><td>07:00</td><td>Resumo diário</td><td>Quantos registros cada ETL carregou</td></tr>
+        <tr><td>08:00</td><td>Alerta de falhas</td><td>Se algum ETL falhou (só dispara se houver erro)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>6.3 Tabela ETL_LOG</h3>
+  <p>Histórico completo de todas as execuções.</p>
+  <pre>SELECT * FROM DRE_AGENTE_ALL.BRONZE.ETL_LOG
+ORDER BY DT_INICIO DESC
+LIMIT 20;</pre>
+
+  <!-- 7. ACESSOS -->
+  <h2 id="acessos-roles">7. Acessos e Roles</h2>
+  <p>Cada pessoa usa uma role (perfil) diferente.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Role</th><th>Quem usa</th><th>O que acessa</th></tr></thead>
+      <tbody>
+        <tr><td><code>ACCOUNTADMIN</code></td><td>Administração geral</td><td>Tudo (usar com cuidado)</td></tr>
+        <tr><td><code>ROLE_LUFT_ADMIN</code></td><td>Alynne, equipe técnica</td><td>Bronze + Silver + Gold + Agente</td></tr>
+        <tr><td><code>ROLE_LUFT_VIEWER</code></td><td>Usuários de negócio</td><td>Gold + Agente (somente leitura)</td></tr>
+        <tr><td><code>ETL_PROTHEUS</code></td><td>Service account (máquina)</td><td>Bronze (carga via Key Pair)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="warning">
+    <strong>Importante:</strong> Não use ACCOUNTADMIN no dia a dia. Use ROLE_LUFT_ADMIN.
+  </div>
+
+  <!-- 8. ADICIONAR DADOS -->
+  <h2 id="adicionar-dados">8. Como Adicionar Novos Dados</h2>
+
+  <h3>8.1 Nova planilha CSV</h3>
+  <ol>
+    <li>Converter para CSV (UTF-8, separador vírgula)</li>
+    <li>Subir para o stage:
+      <pre>PUT file://C:/caminho/arquivo.csv @DRE_AGENTE_ALL.BRONZE.STG_LANDING/pasta/;</pre>
+    </li>
+    <li>Criar tabela Bronze com colunas VARCHAR</li>
+    <li>Carregar dados com COPY INTO</li>
+  </ol>
+
+  <h3>8.2 Nova fonte API/banco</h3>
+  <ol>
+    <li>Criar script Python seguindo padrão dos existentes</li>
+    <li>Adicionar chamada no <code>executar_etl.bat</code></li>
+    <li>Testar manualmente antes de automatizar</li>
+  </ol>
+
+  <h3>8.3 Levar até o agente</h3>
+  <ol>
+    <li>Criar View Gold com nomes amigáveis em português</li>
+    <li>Criar Semantic View com FACTS e DIMENSIONS</li>
+    <li>Alterar o agente adicionando nova ferramenta</li>
+  </ol>
+  <div class="tip">
+    <strong>Dica:</strong> Use as semantic views existentes como modelo para criar novas.
+  </div>
+
+  <!-- 9. MANUTENÇÃO -->
+  <h2 id="manutencao">9. Manutenção Diária</h2>
+  <p>Checklist para verificar todo dia útil:</p>
+  <ul class="checklist">
+    <li>Verificar painel Streamlit (cargas do dia ok?)</li>
+    <li>Se alerta de falha chegou por email, investigar</li>
+    <li>Verificar se warehouse ETL_WH está suspenso (economia de créditos)</li>
+  </ul>
+
+  <div class="tip">
+    <strong>Dica:</strong> Se tudo aparece verde no painel, não precisa fazer nada.
+  </div>
+
+  <!-- 10. CONTATOS -->
+  <h2 id="contatos">10. Contatos e Suporte</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Quem</th><th>Responsabilidade</th><th>Contato</th></tr></thead>
+      <tbody>
+        <tr><td>Felipe Leite (Keyrus)</td><td>Desenvolvedor do projeto</td><td><a href="mailto:felipe.santos@keyrus.com">felipe.santos@keyrus.com</a></td></tr>
+        <tr><td>Alynne (Luft)</td><td>Administradora do ambiente</td><td><a href="mailto:alynne.oya@luftsolutions.com.br">alynne.oya@luftsolutions.com.br</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- GLOSSÁRIO -->
+  <h2 id="glossario">Glossário</h2>
+  <dl class="glossary">
+    <dt>Bronze</dt>
+    <dd>Dados brutos, como vieram da fonte. Sem transformação.</dd>
+    <dt>Silver</dt>
+    <dd>Dados limpos e com tipos corretos (datas, números).</dd>
+    <dt>Gold</dt>
+    <dd>Dados prontos para análise. Camada final.</dd>
+    <dt>Dynamic Table</dt>
+    <dd>Tabela que atualiza sozinha quando a fonte muda.</dd>
+    <dt>Semantic View</dt>
+    <dd>Camada que ensina o agente a entender os dados.</dd>
+    <dt>Stage</dt>
+    <dd>Área temporária para upload de arquivos no Snowflake.</dd>
+    <dt>ETL</dt>
+    <dd>Processo de Extrair, Transformar e Carregar dados.</dd>
+    <dt>Full load</dt>
+    <dd>Apaga tudo e recarrega do zero.</dd>
+    <dt>Incremental</dt>
+    <dd>Carrega apenas dados novos desde a última execução.</dd>
+  </dl>
+
+  <hr style="margin-top: 40px; border: none; border-top: 2px solid light-dark(#e5e7eb, #374151);">
+  <p style="text-align: center; font-size: 12px; color: light-dark(#999, #666); margin-top: 20px;">
+    Documentação gerada em Agosto 2026 | Projeto Keyrus × Luft Logistics
+  </p>
+
+</body>
+</html>
