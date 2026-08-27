@@ -256,7 +256,64 @@ PROJETO/
 
 ---
 
-## 8. Checklist novo projeto Snowflake + Agent
+## 8. Monitoramento padrao (criar em todo projeto)
+
+### Tabela ETL_CONTROL (controle de datas):
+```sql
+CREATE TABLE BRONZE.ETL_CONTROL (
+    API_NAME VARCHAR,
+    ULTIMA_DATA_CARGA DATE,
+    UPDATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+```
+- Uma linha por fonte incremental
+- ETL consulta antes de rodar (sabe de onde comecar)
+- ETL atualiza apos sucesso
+
+### Tabela ETL_LOG (historico de execucoes):
+```sql
+CREATE TABLE BRONZE.ETL_LOG (
+    ID_EXECUCAO NUMBER AUTOINCREMENT,
+    DT_INICIO TIMESTAMP_NTZ,
+    DT_FIM TIMESTAMP_NTZ,
+    NM_TABELA VARCHAR,
+    DS_MODO VARCHAR,
+    QT_EXTRAIDOS NUMBER,
+    QT_DELETADOS NUMBER,
+    QT_CARREGADOS NUMBER,
+    QT_TOTAL_TABELA NUMBER,
+    DS_STATUS VARCHAR,
+    DS_ERRO VARCHAR,
+    DS_FILTRO VARCHAR,
+    QT_DURACAO_SEG NUMBER
+);
+```
+- Todo script insere uma linha ao finalizar (sucesso ou erro)
+- Permite auditoria completa
+- Alimenta o painel Streamlit e alertas
+
+### Alertas por email (criar sempre):
+- Alerta 1: resumo diario (07:00) - quantos registros carregou
+- Alerta 2: falhas (08:00) - dispara se algum ETL teve erro
+- Usar SNOWFLAKE ALERT com NOTIFICATION INTEGRATION
+
+### Painel Streamlit (criar sempre):
+- Cards de status por fonte (ok/erro/atrasado)
+- Tabela com historico de cargas (ultimos 7 dias)
+- Filtro por fonte (Protheus, SILT, TMS, etc.)
+- Destaque vermelho para erros
+- Deploy via stage: `@BRONZE.STG_LANDING/streamlit/app.py`
+
+### Por que fazer isso em todo projeto:
+- Cliente ve que o ETL esta funcionando sem precisar perguntar
+- Erros sao detectados no mesmo dia (nao semanas depois)
+- Facilita troubleshooting (sabe exatamente onde falhou)
+- Historico de volume ajuda a prever crescimento
+- Demonstra profissionalismo na entrega
+
+---
+
+## 9. Checklist novo projeto Snowflake + Agent
 
 - [ ] Definir fontes de dados e volumes
 - [ ] Criar database + schemas (BRONZE, SILVER, GOLD)
