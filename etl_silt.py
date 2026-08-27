@@ -223,14 +223,8 @@ def processar_saldo_estoque(sf_conn):
             filiais = [CNPJ_TESTE]
             log(f'MODO TESTE: apenas 1 filial')
         else:
-            # Tenta pegar lista de CNPJs da API
-            try:
-                filiais = get_filiais_silt()
-            except Exception as e:
-                log(f'Falha ao buscar CNPJs da API: {e}')
-                log('Usando fallback (CNPJs das tabelas NF)...')
-                filiais = get_filiais_fallback(sf_conn)
-
+            # Usa CNPJs das tabelas NF (chamada sem filtro da timeout)
+            filiais = get_filiais_fallback(sf_conn)
             log(f'Total de filiais: {len(filiais)}')
 
         # Trunca tabela (full load)
@@ -244,20 +238,21 @@ def processar_saldo_estoque(sf_conn):
         for i, cnpj in enumerate(filiais, 1):
             log(f'--- Filial {i}/{len(filiais)}: {cnpj} ---')
 
-            if i > 1:
-                time.sleep(15)
+            for is_ag in ['S', 'N']:
+                if i > 1 or is_ag == 'N':
+                    time.sleep(15)
 
-            params = {'cnpjFilial': cnpj}
-            dados = chamar_api('/armazem/saldo-estoque', params)
+                params = {'cnpjFilial': cnpj, 'isAg': is_ag}
+                dados = chamar_api('/armazem/saldo-estoque', params)
 
-            if not dados:
-                log(f'Nenhum dado para filial {cnpj}')
-                continue
+                if not dados:
+                    log(f'Nenhum dado para filial {cnpj} (isAg={is_ag})')
+                    continue
 
-            total_registros_api += len(dados)
-            arquivo = salvar_csv(dados, COLUNAS_SALDO_ESTOQUE, f'saldo_estoque_silt_{i}.csv')
-            qt = carregar_snowflake(sf_conn, arquivo, tabela, stage, len(COLUNAS_SALDO_ESTOQUE), COLUNAS_SALDO_ESTOQUE, truncar=False)
-            qt_total += qt
+                total_registros_api += len(dados)
+                arquivo = salvar_csv(dados, COLUNAS_SALDO_ESTOQUE, f'saldo_estoque_silt_{i}_{is_ag}.csv')
+                qt = carregar_snowflake(sf_conn, arquivo, tabela, stage, len(COLUNAS_SALDO_ESTOQUE), COLUNAS_SALDO_ESTOQUE, truncar=False)
+                qt_total += qt
 
         dt_fim = datetime.datetime.now()
         registrar_log(sf_conn, tabela, 'full', dt_inicio, dt_fim, total_registros_api, total_registros_api, qt_total, 'SUCESSO', None, f'{len(filiais)} filiais')
@@ -372,8 +367,7 @@ if __name__ == '__main__':
     sf_conn = conectar_snowflake()
     try:
         total = 0
-        # SALDO_ESTOQUE desabilitado ate resolver timeout com equipe SILT
-        if apenas == 'SALDO_ESTOQUE':
+        if apenas is None or apenas == 'SALDO_ESTOQUE':
             total += processar_saldo_estoque(sf_conn)
         if apenas is None or apenas == 'NF_ENTRADA':
             total += processar_nf(sf_conn, 'ENTRADA')

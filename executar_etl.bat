@@ -9,4 +9,7 @@ python etl_protheus.py
 echo --- ETL SILT ---
 python etl_silt.py
 
+echo --- ETL TMS ---
+python etl_tms.py
+
 echo === FIM ETL LUFT %date% %time% ===
