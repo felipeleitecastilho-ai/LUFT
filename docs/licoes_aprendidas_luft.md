@@ -206,9 +206,57 @@ PROJETO/
 - **Mensagem em portugues** se projeto BR
 - **Organizar pastas ANTES do commit final** (nao deixar bagunca no repo)
 
+### Regras de seguranca (Snowflake):
+- **SEMPRE fazer backup antes de DROP ou ALTER** (salvar DDL em arquivo local)
+- **SEMPRE fazer backup antes de CREATE OR REPLACE** (perde grants e versoes)
+- Salvar com: `SELECT GET_DDL('objeto', 'nome')` ou `DESCRIBE`
+- Formato do backup: `backup_<objeto>_<YYYYMMDD>.txt`
+
 ---
 
-## 7. Checklist novo projeto Snowflake + Agent
+## 7. Padroes de nomenclatura (seguir em todos os projetos)
+
+### Tabelas:
+- Bronze: `<NOME>_<FONTE>_RAW` (ex: COMPRAS_PROTHEUS_RAW, NF_ENTRADA_SILT_RAW)
+- Silver: `<NOME>` sem sufixo (ex: COMPRAS_CONTABIL, RAZAO, ABASTECIMENTOS)
+- Gold: `VW_SEMANTICA_<NOME>` para views, `DT_<NOME>` para Dynamic Tables, `SEMANTICO_<NOME>` para Semantic Views
+
+### Colunas (prefixos padrao):
+| Prefixo | Significado | Exemplo |
+|---|---|---|
+| CD_ | Codigo | CD_FILIAL, CD_PRODUTO |
+| NM_ | Nome | NM_FILIAL, NM_FORNECEDOR |
+| DS_ | Descricao | DS_CATEGORIA, DS_STATUS |
+| VL_ | Valor monetario | VL_TOTAL, VL_FRETE |
+| QT_ | Quantidade | QT_LITROS, QT_KM |
+| DT_ | Data | DT_EMISSAO, DT_CARGA |
+| DH_ | Data+hora | DH_CARGA |
+| FL_ | Flag (booleano) | FL_ATIVO, FL_RATEIO |
+| PCT_ | Percentual | PCT_MARGEM, PCT_OCUPACAO |
+
+### Colunas na Gold (nomes amigaveis):
+- Remover prefixos: NM_FILIAL → FILIAL
+- Nomes que o usuario entende: VL_TOTAL → VALOR_TOTAL
+- Sem abreviacoes: DS_CTR → DESCRICAO_CONTRATO
+
+### Dynamic Tables Silver:
+- Sempre `lag = 'DOWNSTREAM'`
+- Sempre `warehouse = COMPUTE_WH`
+- Sempre `refresh_mode = 'AUTO'`
+- Converter tipos: TRY_TO_DATE, TRY_CAST
+- TRIM em todos os campos texto
+- Adicionar ANO e MES derivados da data principal
+
+### Semantic Views:
+- Facts = campos numericos (SUM, AVG, MIN, MAX)
+- Dimensions = campos de filtro/agrupamento
+- COMMENT em todos os campos (guia o agente)
+- SAMPLE_VALUES nos campos mais importantes
+- Alias AS deve ser o mesmo nome da coluna (evitar conflitos)
+
+---
+
+## 8. Checklist novo projeto Snowflake + Agent
 
 - [ ] Definir fontes de dados e volumes
 - [ ] Criar database + schemas (BRONZE, SILVER, GOLD)
