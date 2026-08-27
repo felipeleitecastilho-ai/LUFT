@@ -410,23 +410,41 @@ LIMIT 20;</pre>
   <h2 id="adicionar-dados">8. Como Adicionar Novos Dados</h2>
 
   <h3>8.1 Adicionar dados em tabela que já existe</h3>
-  <p>Para carregar novos dados numa tabela Bronze que já existe (ex: novo mês do Razão):</p>
+  <p>A maioria das tabelas CSV tem um <strong>Snowpipe</strong> configurado. Basta subir o arquivo na pasta correta e a carga é automática.</p>
   <ol>
-    <li>Converter o arquivo para CSV (UTF-8, separador vírgula)</li>
-    <li>Subir para o stage na mesma pasta da tabela:
+    <li>Converter o arquivo para CSV (UTF-8, separador vírgula, com header)</li>
+    <li>Subir para o stage na pasta da tabela:
       <pre>PUT file://C:/caminho/arquivo.csv @DRE_AGENTE_ALL.BRONZE.STG_LANDING/pasta/;</pre>
     </li>
-    <li>Carregar na tabela existente:
-      <pre>COPY INTO DRE_AGENTE_ALL.BRONZE.NOME_DA_TABELA_RAW
-FROM @DRE_AGENTE_ALL.BRONZE.STG_LANDING/pasta/
-FILE_FORMAT = (FORMAT_NAME = 'DRE_AGENTE_ALL.BRONZE.CSV_FORMAT');</pre>
-    </li>
+    <li>Pronto! O Snowpipe detecta e carrega sozinho.</li>
   </ol>
+
+  <p><strong>Pastas configuradas com Snowpipe:</strong></p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Pasta no stage</th><th>Tabela destino</th></tr></thead>
+      <tbody>
+        <tr><td><code>/abastecimentos/</code></td><td>ABASTECIMENTOS_RAW</td></tr>
+        <tr><td><code>/armazem/</code></td><td>ARMAZEM_TAMANHO_RAW</td></tr>
+        <tr><td><code>/carga/</code></td><td>CARGA_TRANSPORTE_RAW</td></tr>
+        <tr><td><code>/classificacao/</code></td><td>CLASSIFICACAO_GRUPO_DRE_RAW</td></tr>
+        <tr><td><code>/codigo_filiais/</code></td><td>CODIGO_FILIAIS_RAW</td></tr>
+        <tr><td><code>/consolidado_frota/</code></td><td>CONSOLIDADO_FROTA_RAW</td></tr>
+        <tr><td><code>/depara/</code></td><td>DEPARA_RAW</td></tr>
+        <tr><td><code>/empilhadeira/</code></td><td>EMPILHADEIRA_RAW</td></tr>
+        <tr><td><code>/feriados/</code></td><td>FERIADOS_BR_RAW</td></tr>
+        <tr><td><code>/produtividade/</code></td><td>PRODUTIVIDADE_RAW</td></tr>
+        <tr><td><code>/razao_agro/</code></td><td>RAZAO_AGRO_RAW</td></tr>
+        <tr><td><code>/toneladas/</code></td><td>TONELADAS_RAW</td></tr>
+        <tr><td><code>/compras_protheus/</code></td><td>COMPRAS_PROTHEUS_RAW</td></tr>
+      </tbody>
+    </table>
+  </div>
   <div class="tip">
-    <strong>Dica:</strong> O Silver e Gold atualizam sozinhos (Dynamic Tables). Após o COPY INTO, basta aguardar alguns minutos.
+    <strong>Dica:</strong> Após o PUT, o Silver e Gold atualizam sozinhos (Dynamic Tables). Aguarde alguns minutos.
   </div>
   <div class="warning">
-    <strong>Cuidado:</strong> O CSV precisa ter as mesmas colunas e na mesma ordem da tabela. Se o formato mudou, verifique com: <code>DESCRIBE TABLE nome_tabela;</code>
+    <strong>Cuidado:</strong> O CSV precisa ter as mesmas colunas e na mesma ordem. Se mudou o formato, verifique com: <code>DESCRIBE TABLE nome_tabela;</code>
   </div>
 
   <h3>8.2 Nova planilha CSV (tabela nova)</h3>
